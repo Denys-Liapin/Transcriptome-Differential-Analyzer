@@ -45,16 +45,25 @@ dds <- DESeq(dds)
 # можна переглянути проміжні результати
 # resultsNames(dds)
 
-# зберігаємо проміжні результати 
+# зберігаємо проміжні результати Hom vs Het (100% Tyr) 
 res_disease_100 <- results(dds, contrast = c("Genotype", "Hom", "Het"), alpha = 0.05)
+# зберігаємо проміжні результати Hom vs Het (50% Tyr) 
+res_disease_50 <- results(dds, contrast = list(c("Genotype_Hom_vs_Het", "GenotypeHom.DietHalfTyr")), alpha = 0.05)
+# зберігаємо проміжні результати Hom 50% Tyr vs Hom 100% Tyr
+res_diet_hom <- results(dds, contrast = list(c("Diet_HalfTyr_vs_Complete", "GenotypeHom.DietHalfTyr")), alpha = 0.05)
+# зберігаємо проміжні результати Het 50% Tyr vs Het 100% Tyr
+res_diet_het <- results(dds, contrast = c("Diet", "HalfTyr", "Complete"), alpha = 0.05)
+
+make_volcano <- NA
+make_volcano <- function(res_data, plot_title) {
 
 # записуємо 10 найбільш статистично значуших генів (для подальшого підпису їх на графіках)
-top_genes <- head(rownames(res_disease_100[order(res_disease_100$padj), ]), 10)
+top_genes <- head(rownames(res_data[order(res_data$padj), ]), 10)
 
 # підготовка Volcano plot
 p <- EnhancedVolcano(
-  res_disease_100,
-  lab = rownames(res_disease_100),       # Назви генів беремо з назв рядків
+  res_data,
+  lab = rownames(res_data),              # Назви генів беремо з назв рядків
   x = 'log2FoldChange',                  # Вісь X — величина ефекту
   y = 'padj',                            # Вісь Y — скоригований p-value (FDR)
   selectLab = top_genes,
@@ -62,11 +71,10 @@ p <- EnhancedVolcano(
   FCcutoff = 1.0,                        # Вертикальні лінії сили ефекту (вдвічі)
   pointSize = 0.5,                       # Розмір точок-генів
   labSize = 2.0,                         # Розмір тексту з назвами топ-генів
-  title = 'Disease Effect: Hom vs Het (100% Tyr)',
+  title = plot_title,
   subtitle = 'Volcano plot',
   legendPosition = 'right'
 )
-
 
 p_final <- p + 
   coord_cartesian(
@@ -77,11 +85,22 @@ p_final <- p +
   scale_x_continuous(breaks = seq(-4, 4, by = 1)) +
   scale_y_continuous(breaks = seq(0, 30, by = 5))
 
+return(p_final)
+}
+
 # зберігаємо варіант Volcano plot
-ggsave(
-  filename = "Volcano_Disease.png", 
-  plot = p_final, 
-  width = 12, 
-  height = 9, 
-  dpi = 300
-)
+# Disease effect 100% Tyr
+p1 <- make_volcano(res_disease_100, 'Disease Effect: Hom vs Het (100% Tyr)')
+ggsave("Volcano_Disease_100.png", plot = p1, width = 12, height = 9, dpi = 300)
+
+# Disease effect 50% Tyr
+p2 <- make_volcano(res_disease_50, 'Disease Effect: Hom vs Het (50% Tyr)')
+ggsave("Volcano_Disease_50.png", plot = p2, width = 12, height = 9, dpi = 300)
+
+# Diet effect on Het
+p3 <- make_volcano(res_diet_het, 'Diet Effect: 50% vs 100% Tyr (Het)')
+ggsave("Volcano_Diet_Het.png", plot = p3, width = 12, height = 9, dpi = 300)
+
+# Diet effect on Hom
+p4 <- make_volcano(res_diet_hom, 'Diet Effect: 50% vs 100% Tyr (Hom)')
+ggsave("Volcano_Diet_Hom.png", plot = p4, width = 12, height = 9, dpi = 300)
