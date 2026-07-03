@@ -245,8 +245,66 @@ ggsave("MA_Diet_Hom.png", plot = ma4, width = 11, height = 8, dpi = 300, bg = "w
 # ____________________Heatmap of significant genes______________________________
 vst_mat <- assay(vst(dds, blind = FALSE))
 
+make_heatmap <- function(vst_matrix, gene_list, plot_title, file_name) {
+  
+  # беремо з матриці тільки ті гени, які пройшли фільтр
+  heatmap_data <- vst_matrix[rownames(vst_matrix) %in% gene_list, ]
+  
+  # Захист: якщо значущих генів майже немає Heatmap не будується
+  if (nrow(heatmap_data) < 2) {
+    message("Занадто мало генів для побудови Heatmap: ", plot_title)
+    return(NULL)
+  }
+  
+  # Беремо метадані з dds для кольорових смужок зверху
+  annotation_col <- as.data.frame(colData(dds)[, c("Genotype", "Diet")])
+  
+  # Задаємо кольори для груп
+  ann_colors <- list(
+    Genotype = c(Het = "#1465B2", Hom = "#B31B21"),
+    Diet = c(Complete = "#2CA02C", HalfTyr = "#FF7F0E")
+  )
+  
+  # Колірна палітра: від синього (низька експресія) до червоного (вища)
+  display_colors <- colorRampPalette(rev(brewer.pal(n = 7, name = "RdYlBu")))(100)
+  
+  # Малюємо та зберігаємо
+  pheatmap(
+    heatmap_data,
+    cluster_rows = TRUE,           # Групувати схожі гени разом
+    cluster_cols = TRUE,           # показує чи згрупувалися повтори разом
+    scale = "row",                 # Переводить у Z-score (відносна зміна)
+    show_rownames = (nrow(heatmap_data) <= 50), # Ховаємо назви, якщо генів забагато
+    show_colnames = TRUE,          # Показуємо шифри
+    annotation_col = annotation_col,
+    annotation_colors = ann_colors,
+    color = display_colors,
+    main = paste0(plot_title, " (CONFIDENTIAL - DRAFT)"),
+    filename = file_name,          # збереження
+    width = 10,
+    height = 8
+  )
+}
 
+genes_dis100 <- head(rownames(res_disease_100[order(res_disease_100$padj), ]), 50)
+make_heatmap(vst_mat, genes_dis100, 
+             "Heatmap: Top 50 DEGs - Hom vs Het (100% Tyr)", 
+             "Heatmap_Disease_100.png")
 
+genes_dis50 <- head(rownames(res_disease_50[order(res_disease_50$padj), ]), 50)
+make_heatmap(vst_mat, genes_dis50, 
+             "Heatmap: Top 50 DEGs - Hom vs Het (50% Tyr)", 
+             "Heatmap_Disease_50.png")
+
+genes_diet_hom <- rownames(subset(res_diet_hom, padj < 0.05 & abs(log2FoldChange) > 1))
+make_heatmap(vst_mat, genes_diet_hom, 
+             "Heatmap: All DEGs - Diet effect Hom 50% Tyr vs Hom 100% Tyr", 
+             "Heatmap_Diet_Hom.png")
+
+genes_diet_het <- rownames(subset(res_diet_het, padj < 0.05 & abs(log2FoldChange) > 1))
+make_heatmap(vst_mat, genes_diet_het, 
+             "Heatmap: All DEGs - Diet Effect Het 50% Tyr vs Het 100% Tyr", 
+             "Heatmap_Diet_Het.png")
 
 
 
