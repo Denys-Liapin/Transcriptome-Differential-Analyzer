@@ -6,6 +6,10 @@ library(ggvenn)
 library(ggpubr)
 library(pheatmap)
 library(RColorBrewer)
+library(clusterProfiler)
+library(org.Dm.eg.db)
+
+
 
 
 # завантажили таблицю
@@ -256,6 +260,9 @@ make_heatmap <- function(vst_matrix, gene_list, plot_title, file_name) {
     return(NULL)
   }
   
+  # СОРТУВАННЯ СТОВПЧИКІВ ЗА НАЗВАМИ
+  heatmap_data <- heatmap_data[, order(colnames(heatmap_data))]
+  
   # Беремо метадані з dds для кольорових смужок зверху
   annotation_col <- as.data.frame(colData(dds)[, c("Genotype", "Diet")])
   
@@ -272,7 +279,7 @@ make_heatmap <- function(vst_matrix, gene_list, plot_title, file_name) {
   pheatmap(
     heatmap_data,
     cluster_rows = TRUE,           # Групувати схожі гени разом
-    cluster_cols = TRUE,           # показує чи згрупувалися повтори разом
+    cluster_cols = FALSE,          # показує чи згрупувалися повтори разом
     scale = "row",                 # Переводить у Z-score (відносна зміна)
     show_rownames = (nrow(heatmap_data) <= 50), # Ховаємо назви, якщо генів забагато
     show_colnames = TRUE,          # Показуємо шифри
@@ -310,6 +317,97 @@ make_heatmap(vst_mat, genes_diet_het,
 
 
 
+
+
+
+
+# =========================Gene Set Enrichment Analysis=========================
+make_gsea_analysis <- function(res_data, plot_title, file_prefix) {
+  
+  df <- as.data.frame(res_data)
+  # Прибираємо гени з NA
+  df <- df[!is.na(df$log2FoldChange), ]
+  
+  # Розраховуємо метрику ранжування (Ранг = знак зсуву * (-log10 від p-value))
+  df$ranking_metric <- sign(df$log2FoldChange) * (-log10(df$pvalue))
+  # Захист від нескінченних значень, якщо pvalue було рівним 0
+  df$ranking_metric[is.na(df$ranking_metric) | is.infinite(df$ranking_metric)] <- 
+    sign(df$log2FoldChange[is.na(df$ranking_metric) | is.infinite(df$ranking_metric)]) * 300
+  
+  # Сортуємо гени за спаданням рангу
+  df_sorted <- df[order(-df$ranking_metric), ]
+  
+  # Формуємо іменований вектор для clusterProfiler
+  gene_list <- df_sorted$ranking_metric
+  names(gene_list) <- rownames(df_sorted)
+  
+  message("Запуск gseGO для мухи (Drosophila): ", plot_title, "... Це може зайняти 1-2 хвилини.")
+  
+  # org.Dm.eg.db автоматично розпізнає назви
+  gsea_res <- clusterProfiler::gseGO(
+    geneList     = gene_list,
+    OrgDb        = org.Dm.eg.db, # база даних
+    Ontology     = "BP",         # Biological Process     
+    keyType      = "SYMBOL",     
+    minGSSize    = 10,          
+    maxGSSize    = 500,         
+    pvalueCutoff = 0.05,        
+    verbose      = FALSE,
+    pAdjustMethod = "BH"         # Корекція Бенджаміні-Хохберга
+  )
+  
+  # Перевірка: якщо жоден шлях не збагатився — виходимо
+  if (is.null(gsea_res) || nrow(gsea_res) == 0) {
+    message("⚠️ Жодних значущих біологічних шляхів не знайдено для: ", plot_title)
+    return(NULL)
+  }
+  
+  # Графік 1: Dotplot
+  # Показує активовані (червоні) та пригнічені (сині) процеси
+  p_dot <- dotplot(gsea_res, showCategory = 20, split = ".sign") + 
+    labs(title = paste0("GSEA (Drosophila): ", plot_title)) +
+    theme(plot.title = element_text(face = "bold", size = 12))
+  
+  ggsave(paste0(file_prefix, "_GSEA_Dotplot.png"), plot = p_dot, 
+         width = 11, height = 20, dpi = 300, bg = "white")
+  
+  # Графік 2: Top Pathway. GSEA крива-графік (Enrichment Score) для топ-1 найсильнішого шляху
+  p_gsea <- enrichplot::gseaplot2(gsea_res, geneSetID = 1, title = gsea_res$Description[1])
+  
+  ggsave(paste0(file_prefix, "_GSEA_TopPath.png"), plot = p_gsea, 
+         width = 9, height = 7, dpi = 300, bg = "white")
+  
+  return(gsea_res)
+}
+
+
+# Hom vs Het (100% Tyr)
+gsea_disease_100 <- make_gsea_analysis(
+  res_data = res_disease_100, 
+  plot_title = "Disease Effect - Hom vs Het (100% Tyr)", 
+  file_prefix = "Disease_100"
+)
+
+# Hom vs Het (50% Tyr)
+gsea_disease_50 <- make_gsea_analysis(
+  res_data = res_disease_50, 
+  plot_title = "Disease Effect - Hom vs Het (50% Tyr)", 
+  file_prefix = "Disease_50"
+)
+
+# Hom 50% Tyr vs Hom 100% Tyr
+gsea_diet_hom <- make_gsea_analysis(
+  res_data = res_diet_hom, 
+  plot_title = "Diet Effect - Hom 50% vs 100% Tyr", 
+  file_prefix = "Diet_Hom"
+)
+
+# Het 50% Tyr vs Het 100% Tyr
+gsea_diet_het <- make_gsea_analysis(
+  res_data = res_diet_het, 
+  plot_title = "Diet Effect - Het 50% vs 100% Tyr", 
+  file_prefix = "Diet_Het"
+)
 
 
 
