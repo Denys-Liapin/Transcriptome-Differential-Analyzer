@@ -8,6 +8,7 @@ library(pheatmap)
 library(RColorBrewer)
 library(clusterProfiler)
 library(org.Dm.eg.db)
+library(stringr)
 
 
 
@@ -408,6 +409,70 @@ gsea_diet_het <- make_gsea_analysis(
   plot_title = "Diet Effect - Het 50% vs 100% Tyr", 
   file_prefix = "Diet_Het"
 )
+
+
+
+
+
+# ======================Over-representation analysis (ORA)======================
+make_ora_analysis <- function(res_data, plot_title, file_prefix) {
+  
+  df <- as.data.frame(res_data)
+  
+  # Відбираємо ТІЛЬКИ значущі гени. Беремо стандартний поріг padj < 0.05
+  sig_genes <- rownames(df[which(df$padj < 0.05), ])
+  
+  # Якщо значущих генів немає або їх менше 2-3, аналіз не запуститься
+  if (length(sig_genes) < 2) {
+    message("⚠️ Занадто мало значущих генів для ORA у контрасті: ", plot_title)
+    return(NULL)
+  }
+  
+  message("Запуск ORA (enrichGO) для: ", plot_title, ". Кількість генів: ", length(sig_genes))
+  
+  # Запуск аналізу перенасичення
+  ora_res <- enrichGO(
+    gene          = sig_genes,
+    OrgDb         = org.Dm.eg.db, # База
+    keyType       = "SYMBOL",     # назви генів
+    pAdjustMethod = "BH",         # Корекція Бенджаміні-Хохберга
+    pvalueCutoff  = 0.05,         # Залишаємо лише значущі шляхи
+    qvalueCutoff  = 0.2           # Додатковий фільтр надійності
+  )
+  
+  if (is.null(ora_res) || nrow(ora_res) == 0) {
+    message("⚠️ Жодних значущих процесів в ORA не знайдено для: ", plot_title)
+    return(NULL)
+  }
+  
+  # Візуалізація
+  ora_res_plot <- ora_res
+  ora_res_plot@result$Description <- stringr::str_wrap(ora_res_plot@result$Description, width = 40)
+  
+  p_bar <- barplot(ora_res_plot, showCategory = 12) + 
+    labs(title = paste0("ORA Barplot: ", plot_title)) +
+    theme_minimal() +
+    theme(axis.text.y = element_text(size = 8, lineheight = 0.8))
+  
+  ggsave(paste0(file_prefix, "_ORA_Barplot.png"), plot = p_bar, 
+         width = 9, height = 8, dpi = 300, bg = "white")
+  
+  return(ora_res)
+}
+
+
+# Hom vs Het (100% Tyr)
+ora_disease_100 <- make_ora_analysis(res_disease_100, "Disease Effect - 100% Tyr", "Disease_100")
+
+# Hom vs Het (50% Tyr)
+ora_disease_50 <- make_ora_analysis(res_disease_50, "Disease Effect - 50% Tyr", "Disease_50")
+
+# Hom 50% Tyr vs Hom 100% Tyr
+ora_diet_hom <- make_ora_analysis(res_diet_hom, "Diet Effect - Hom 50% vs 100%", "Diet_Hom")
+
+# Het 50% Tyr vs Het 100% Tyr
+ora_diet_het <- make_ora_analysis(res_diet_het, "Diet Effect - Het 50% vs 100%", "Diet_Het")
+
 
 
 
