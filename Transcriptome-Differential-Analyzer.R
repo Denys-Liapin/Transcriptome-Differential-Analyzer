@@ -544,6 +544,28 @@ pheatmap(
 
 
 
+#===========================Interaction analysis================================
+
+
+# Витягуємо результати для взаємодії
+res_interaction <- results(dds, name = "GenotypeHom.DietHalfTyr") # Впиши сюди точну назву останнього коефіцієнта з результату resultsNames(dds)
+
+# Переводимо в таблицю та фільтруємо значущі гени взаємодії
+df_int <- as.data.frame(res_interaction)
+sig_interaction_genes <- df_int[which(df_int$padj < 0.05 & abs(df_int$log2FoldChange) > 1), ]
+
+message("Кількість генів з ефектом взаємодії: ", nrow(sig_interaction_genes))
+
+
+
+
+
+
+
+# ==========================Pathway interpretation==============================
+
+
+
 
 
 # _______________________________Венки__________________________________________
