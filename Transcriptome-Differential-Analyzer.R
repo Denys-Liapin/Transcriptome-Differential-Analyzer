@@ -479,8 +479,74 @@ ora_diet_het <- make_ora_analysis(res_diet_het, "Diet Effect - Het 50% vs 100%",
 
 
 
+# ============================Specific gene Heatmap=============================
+library(KEGGREST)
 
-# _______________________________________________________________________
+# Запускаємо трансформацію стабілізації дисперсії (VST)
+vst_counts <- DESeq2::vst(dds, blind = FALSE)
+
+# ----------------------group of gene by coded----------------------------------
+kegg_pathway <- keggGet("dme00280")
+kegg_genes <- kegg_pathway[[1]]$GENE
+
+# Витягуємо суто SYMBOL назви генів (вони в KEGG йдуть парно з ID)
+valine_genes_raw <- kegg_genes[seq(2, length(kegg_genes), by = 2)]
+# Прибираємо системні підписи, залишаємо чисті назви генів
+valine_gene_symbols <- sapply(strsplit(valine_genes_raw, ";"), "[", 1)
+
+# Фільтруємо нормалізовані VST-дані суто під цей список генів
+available_genes <- intersect(valine_gene_symbols, rownames(vst_counts))
+valine_matrix <- assay(vst_counts)[available_genes, ]
+
+# Малюємо цільовий хитмап
+pheatmap(
+  valine_matrix, 
+  scale = "row",          # Нормалізуємо по рядках, щоб бачити зсуви експресії
+  show_rownames = TRUE,   # Обов'язково показуємо назви генів
+  cluster_cols = FALSE,   # Не перемішуємо стовпчики, тримаємо замовлену чергу груп
+  annotation_col = as.data.frame(colData(dds)[, c("Genotype", "Diet")]), # додаємо підписи груп
+  main = "Expression of Valine Metabolism Genes",
+  filename = "Code_Target_Genes_Heatmap.png",
+  width = 7,
+  height = 4 
+)
+
+
+# -----------------------------target gene--------------------------------------
+# Вручну вписуємо назви генів
+my_target_genes <- c("Hibch", "Thor")
+
+# Перевіряємо, чи є ці гени у нормалізованих даних
+available_genes <- intersect(my_target_genes, rownames(vst_counts))
+
+# Перевірка: якщо якийсь ген написано з помилкою, R попередить
+if(length(available_genes) < length(my_target_genes)) {
+  message("⚠️ Увага! Деякі гени не знайдено в матриці зразків. Перевір правопис.")
+}
+
+# Витягуємо матрицю суто для цих генів
+valine_matrix <- assay(vst_counts)[available_genes, , drop = FALSE] 
+# Примітка: drop = FALSE потрібен обов'язково, щоб R не зламав структуру матриці, коли генів так мало
+
+# Малюємо Heatmap
+pheatmap(
+  valine_matrix, 
+  scale = "row",          
+  show_rownames = TRUE,   
+  cluster_cols = FALSE,
+  cluster_rows = FALSE,
+  annotation_col = as.data.frame(colData(dds)[, c("Genotype", "Diet")]), 
+  main = "Expression of Selected Target Genes",
+  filename = "Target_Genes_Heatmap.png",
+  width = 7,
+  height = 4 
+)
+
+
+
+
+
+# _______________________________Венки__________________________________________
 # СТВОРЮЄМО МЕТОД
 make_venn_plot <- function(venn_data, colors, file_name) {
   
