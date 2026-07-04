@@ -252,13 +252,19 @@ vst_mat <- assay(vst(dds, blind = FALSE))
 
 make_heatmap <- function(vst_matrix, gene_list, plot_title, file_name) {
   
+  # Якщо списку немає, він порожній або там менше 2 генів — одразу виходимо
+  if (is.null(gene_list) || length(gene_list) < 2) {
+    message("⚠️ Пропуск: Занадто мало генів (< 2) у списку для: ", plot_title)
+    return(invisible(FALSE))
+  }
+  
   # беремо з матриці тільки ті гени, які пройшли фільтр
   heatmap_data <- vst_matrix[rownames(vst_matrix) %in% gene_list, ]
   
   # Захист: якщо значущих генів майже немає Heatmap не будується
-  if (nrow(heatmap_data) < 2) {
+  if (is.null(heatmap_data) || nrow(heatmap_data) < 2) {
     message("Занадто мало генів для побудови Heatmap: ", plot_title)
-    return(NULL)
+    return(invisible(FALSE))
   }
   
   # СОРТУВАННЯ СТОВПЧИКІВ ЗА НАЗВАМИ
@@ -559,15 +565,6 @@ message("Кількість генів з ефектом взаємодії: ", 
 
 
 
-
-
-
-# ==========================Pathway interpretation==============================
-
-
-
-
-
 # _______________________________Венки__________________________________________
 # СТВОРЮЄМО МЕТОД
 make_venn_plot <- function(venn_data, colors, file_name) {
@@ -648,4 +645,22 @@ for (i in 1:nrow(pairs_matrix)) {
   # Викликаємо метод
   make_venn_plot(current_pair, col_pair, file_title)
 }
+
+
+
+
+
+#======================Candidate genes==========================================
+# Витягуємо лідерів для головного ефекту хвороби на дієті
+top_candidates <- as.data.frame(res_disease_50)
+
+# Фільтруємо за суворими критеріями: висока значущість та сильний ефект (зміна > ніж у 3 рази)
+top_candidates <- top_candidates[which(top_candidates$padj < 0.01 & abs(top_candidates$log2FoldChange) > 1.5), ]
+
+# Сортуємо: спочатку ті, у кого найменший padj
+top_candidates <- top_candidates[order(top_candidates$padj), ]
+
+# Дивимося на першу десятку
+head(top_candidates, 10)
+
 
