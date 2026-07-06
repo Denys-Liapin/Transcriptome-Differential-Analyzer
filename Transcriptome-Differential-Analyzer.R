@@ -11,7 +11,7 @@ library(org.Dm.eg.db)
 library(stringr)
 
 # uploaded the table
-rowData <- as.data.frame(read_excel("DenysData.xlsx"))
+rowData <- as.data.frame(read_excel("data.xlsx"))
 # deleted the first 2 lines with technical information
 data <- rowData[-(1:2), ]
 # row name = the text in the first column
