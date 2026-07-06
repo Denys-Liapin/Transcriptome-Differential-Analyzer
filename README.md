@@ -11,7 +11,7 @@ sudo Rscript install.R
 
 ### Start of analysis
 ```bash
-Rscript Analyzer.R data.xlsx
+Rscript Transcriptome-Differential-Analyzer.R data.xlsx
 ```
 
 # Pipeline Features & Logic
